@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- SEO & Metadata -->
+    <meta charset="UTF-8">
+    <title>Shatter Lab - Interactive 3D Explosion Simulator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Explore Shatter Lab, an interactive 3D physics sandbox. Load your own STL models, customize explosion parameters like force, fragments, and gravity, and watch them shatter in real-time.">
+    <meta name="keywords" content="3D, physics, simulator, shatter, explosion, interactive, WebGL, Three.js, STL viewer, digital toy, Chris Pirillo, Pirillo Arcade">
+    <meta name="author" content="Chris Pirillo">
+    <link rel="canonical" href="https://pirillo.com/arcade/shatter-lab.html">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://pirillo.com/arcade/shatter-lab.html">
+    <meta property="og:title" content="Shatter Lab - Interactive 3D Explosion Simulator">
+    <meta property="og:description" content="An interactive 3D physics sandbox to load and shatter models.">
+    <meta property="og:image" content="https://pirillo.com/arcade/images/shatter-lab.png">
+    <meta property="og:site_name" content="Pirillo Arcade">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://pirillo.com/arcade/shatter-lab.html">
+    <meta property="twitter:title" content="Shatter Lab - Interactive 3D Explosion Simulator">
+    <meta property="twitter:description" content="An interactive 3D physics sandbox to load and shatter models.">
+    <meta property="twitter:image" content="https://pirillo.com/arcade/images/shatter-lab.png">
+    <meta name="twitter:creator" content="@ChrisPirillo">
+
+    <!-- Performance Resource Hints -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" as="script">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1CQ4D3VQ3L"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1CQ4D3VQ3L');
+    </script>
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "name": "Shatter Lab",
+      "url": "https://pirillo.com/arcade/shatter-lab.html",
+      "author": {
+        "@type": "Person",
+        "name": "Chris Pirillo"
+      },
+      "publisher": {
+        "@type": "Person",
+        "name": "Chris Pirillo"
+      },
+      "description": "Shatter Lab is an interactive 3D physics simulator and digital toy where users can load 3D models and watch them explode based on customizable physics parameters.",
+      "applicationCategory": "Game",
+      "operatingSystem": "All",
+      "browserRequirements": "Requires a modern web browser with WebGL support.",
+      "image": "https://pirillo.com/arcade/images/shatter-lab.png",
+      "playMode": "singlePlayer",
+      "gamePlatform": "PC (Browser)"
+    }
+    </script>
+
+    <!-- Critical CSS -->
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Silkscreen', sans-serif;
+            background-color: #000000;
+            color: #f5f5f7;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        canvas {
+            display: block;
+        }
+        #controls {
+            position: absolute;
+            top: 1.5rem;
+            left: 1.5rem;
+            background-color: rgba(28, 28, 30, 0.75);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            max-width: 340px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 10;
+            max-height: calc(100vh - 3rem);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #controls::-webkit-scrollbar { display: none; }
+        #controls { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .control-group { margin-bottom: 1.25rem; }
+        
+        label, .label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            color: #e5e5e7;
+        }
+        .slider-value {
+            display: inline-block;
+            min-width: 4rem;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(118, 118, 128, 0.24);
+            border-radius: 3px;
+            outline: none;
+            transition: background 0.3s;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .btn {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            border-radius: 0.6rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border: none;
+            text-align: center;
+            outline: none;
+        }
+        .btn:focus-visible { box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.5); }
+        .btn:disabled {
+            background-color: rgba(118, 118, 128, 0.24);
+            color: rgba(235, 235, 245, 0.3);
+            cursor: not-allowed;
+        }
+        .btn:active:not(:disabled) { transform: scale(0.97); }
+        .btn-secondary { background-color: rgba(118, 118, 128, 0.24); color: #f5f5f7; }
+        .btn-secondary:hover:not(:disabled) { background-color: rgba(118, 118, 128, 0.36); }
+        input[type="file"] { display: none; }
+        .file-label { display: inline-block; margin-bottom: 1rem; }
+        #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(28, 28, 30, 0.85);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            z-index: 100;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+            max-width: 90%;
+        }
+
+        .custom-select-container { position: relative; }
+        .custom-select-button {
+            width: 100%;
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-radius: 0.6rem;
+            background-color: rgba(118, 118, 128, 0.24);
+            border: 1px solid rgba(118, 118, 128, 0.5);
+            color: #f5f5f7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .custom-select-button:hover { background-color: rgba(118, 118, 128, 0.36); }
+        .custom-select-options {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #2c2c2e;
+            border-radius: 0.6rem;
+            margin-top: 0.25rem;
+            overflow: hidden;
+            z-index: 20;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .custom-select-option {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .custom-select-option:hover { background-color: #0A84FF; }
+        .custom-select-option.selected { background-color: #0A84FF; font-weight: 600; }
+        
+        #makerdeck-link {
+            position: absolute;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            z-index: 10;
+            color: rgba(255, 255, 255, 0.5);
+            text-decoration: none;
+            transition: color 0.2s;
+            font-size: 0.8rem;
+        }
+        #makerdeck-link:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <main>
+        <div id="canvas-container" aria-hidden="true"></div>
+        <aside id="controls" role="complementary">
+            <h1 class="text-xl font-bold mb-4">Shatter Lab</h1>
+            <label for="stl-loader" class="btn btn-secondary file-label">Load Custom STL</label>
+            <input type="file" id="stl-loader" accept=".stl">
+            
+            <section class="control-group" aria-labelledby="explosion-style-label">
+                <label id="explosion-style-label" class="label">Explosion Style</label>
+                <div id="explosion-style-select" class="custom-select-container" data-value="0">
+                    <div class="custom-select-button" role="button" aria-haspopup="listbox" aria-expanded="false">
+                        <span id="explosion-style-value">Radial</span>
+                        <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m6 8 4 4 4-4"/></svg>
+                    </div>
+                    <div id="explosion-style-options" class="custom-select-options hidden" role="listbox">
+                        <div class="custom-select-option selected" role="option" aria-selected="true" data-value="0">Radial</div>
+                        <div class="custom-select-option" role="option" data-value="1">Shatter</div>
+                        <div class="custom-select-option" role="option" data-value="2">Implode</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="control-group" aria-labelledby="fragments-label">
+                <label for="fragments-slider" id="fragments-label">Fragments: <span id="fragments-value" class="slider-value">250</span></label>
+                <input type="range" id="fragments-slider" min="10" max="2000" value="250">
+            </section>
+            <section class="control-group" aria-labelledby="force-label">
+                <label for="force-slider" id="force-label">Explosion Force: <span id="force-value" class="slider-value">50</span></label>
+                <input type="range" id="force-slider" min="1" max="100" value="50">
+            </section>
+            <section class="control-group" aria-labelledby="spin-label">
+                <label for="spin-slider" id="spin-label">Fragment Spin: <span id="spin-value" class="slider-value">1.0</span></label>
+                <input type="range" id="spin-slider" min="0" max="10" step="0.1" value="1.0">
+            </section>
+            <section class="control-group" aria-labelledby="gravity-label">
+                <label for="gravity-slider" id="gravity-label">Gravity: <span id="gravity-value" class="slider-value">5.0</span></label>
+                <input type="range" id="gravity-slider" min="0" max="50" step="0.1" value="5.0">
+            </section>
+            <section class="control-group" aria-labelledby="damping-label">
+                <label for="damping-slider" id="damping-label">Damping: <span id="damping-value" class="slider-value">0.1</span></label>
+                <input type="range" id="damping-slider" min="0" max="1" step="0.01" value="0.1">
+            </section>
+            <section class="control-group" aria-labelledby="duration-label">
+                <label for="duration-slider" id="duration-label">Explosion Duration: <span id="duration-value" class="slider-value">5.0s</span></label>
+                <input type="range" id="duration-slider" min="1" max="10" step="0.1" value="5.0">
+            </section>
+            <section class="control-group" aria-labelledby="timescale-label">
+                <label for="timescale-slider" id="timescale-label">Time Scale: <span id="timescale-value" class="slider-value">1.0x</span></label>
+                <input type="range" id="timescale-slider" min="0.1" max="1" step="0.05" value="1.0">
+            </section>
+            
+            <section class="control-group" aria-labelledby="hue-label">
+                <label for="hue-slider" id="hue-label">Hue: <span id="hue-value" class="slider-value">0.50</span></label>
+                <input type="range" id="hue-slider" min="0" max="1" step="0.01" value="0.5">
+            </section>
+            
+            <div class="flex space-x-2 mt-6">
+                <button id="rebuild-btn" class="btn btn-secondary">Rebuild</button>
+                <button id="randomize-btn" class="btn btn-secondary">Randomize</button>
+            </div>
+        </aside>
+        <div id="message-box" role="alert"><p id="message-text"></p></div>
+    </main>
+    
+    <a id="makerdeck-link" href="https://twitch.tv/makerdeck" target="_blank" rel="noopener noreferrer">MakerDeck</a>
+    
+    <!-- Deferred scripts to prevent render-blocking -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js" defer></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const canvasContainer = document.getElementById('canvas-container');
+            const stlLoaderInput = document.getElementById('stl-loader');
+            const rebuildBtn = document.getElementById('rebuild-btn');
+            const fragmentsSlider = document.getElementById('fragments-slider');
+            const forceSlider = document.getElementById('force-slider');
+            const spinSlider = document.getElementById('spin-slider');
+            const gravitySlider = document.getElementById('gravity-slider');
+            const dampingSlider = document.getElementById('damping-slider');
+            const durationSlider = document.getElementById('duration-slider');
+            const timescaleSlider = document.getElementById('timescale-slider');
+            const explosionStyleSelect = document.getElementById('explosion-style-select');
+            const fragmentsValue = document.getElementById('fragments-value');
+            const forceValue = document.getElementById('force-value');
+            const spinValue = document.getElementById('spin-value');
+            const gravityValue = document.getElementById('gravity-value');
+            const dampingValue = document.getElementById('damping-value');
+            const durationValue = document.getElementById('duration-value');
+            const timescaleValue = document.getElementById('timescale-value');
+            const messageBox = document.getElementById('message-box');
+            const messageText = document.getElementById('message-text');
+            const hueSlider = document.getElementById('hue-slider');
+            const hueValue = document.getElementById('hue-value');
+            const randomizeBtn = document.getElementById('randomize-btn');
+
+            // --- Three.js & Global Variables ---
+            let scene, camera, renderer, controls, clock;
+            let originalModel = null;
+            let explodedModel = null;
+            let isExploded = false;
+            let explosionTime = 0;
+            let explosionInProgress = false;
+            let messageTimeout;
+            const backgroundColor = 0x000000;
+            let modelSize = 1.0;
+            let modelColor = new THREE.Color();
+            let modelHue = 0.5;
+            let boomSynth, noiseSynth, distortion, lowPass, compressor;
+
+            // --- Shaders ---
+            const vertexShader = `
+                attribute vec3 fragmentGroupCenter;
+                attribute float fragmentId;
+                uniform float u_time;
+                uniform float u_duration;
+                uniform float u_force;
+                uniform float u_spin;
+                uniform float u_gravity;
+                uniform float u_damping;
+                uniform int u_explosionType; 
+                uniform vec3 u_explosionCenter;
+                varying vec3 vNormal;
+                mat3 rotation3d(vec3 axis, float angle) {
+                    axis = normalize(axis);
+                    float s = sin(angle);
+                    float c = cos(angle);
+                    float oc = 1.0 - c;
+                    return mat3(
+                        oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,
+                        oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,
+                        oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c
+                    );
+                }
+                float rand(vec2 co){ return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
+                float easeOutQuint(float x) { return 1.0 - pow(1.0 - x, 5.0); }
+                float easeInOutQuint(float x) { return x < 0.5 ? 16.0 * x * x * x * x * x : 1.0 - pow(-2.0 * x + 2.0, 5.0) / 2.0; }
+                void main() {
+                    vNormal = normal;
+                    vec3 pos = position;
+                    if (u_time > 0.0) {
+                        float time = min(u_time, u_duration);
+                        float progress = time / u_duration;
+                        vec3 explosionOrigin = u_explosionCenter;
+                        if (u_explosionType == 1) { explosionOrigin = vec3(0.0); }
+                        vec3 initialVelocity = normalize(fragmentGroupCenter - explosionOrigin) * u_force * (0.75 + rand(vec2(fragmentId, 4.0)) * 0.5);
+                        vec3 gravity = vec3(0.0, -u_gravity, 0.0);
+                        vec3 velocityDisplacement = initialVelocity * time;
+                        vec3 gravityDisplacement = 0.5 * gravity * time * time;
+                        float dampingFactor = exp(-u_damping * time);
+                        vec3 totalDisplacement = (velocityDisplacement * dampingFactor) + gravityDisplacement;
+                        if (u_explosionType == 2) {
+                            float implodeTime = u_duration * 0.4;
+                            if (time < implodeTime) {
+                                float implodeProgress = easeInOutQuint(time / implodeTime);
+                                pos += initialVelocity * -0.6 * implodeProgress;
+                            } else {
+                                float explodeTime = time - implodeTime;
+                                vec3 startPos = initialVelocity * -0.6 * implodeTime;
+                                vec3 explodeVelocity = initialVelocity * 1.5;
+                                vec3 gDisp = 0.5 * gravity * explodeTime * explodeTime;
+                                vec3 vDisp = explodeVelocity * explodeTime;
+                                float dFactor = exp(-u_damping * explodeTime);
+                                pos += startPos + (vDisp * dFactor) + gDisp;
+                            }
+                        } else { pos += totalDisplacement; }
+                        float rotationProgress = easeOutQuint(progress);
+                        vec3 randomAxis = normalize(vec3(rand(vec2(fragmentId, 0.0)) - 0.5, rand(vec2(fragmentId, 1.0)) - 0.5, rand(vec2(fragmentId, 2.0)) - 0.5));
+                        float angle = rotationProgress * u_spin * (1.0 + rand(vec2(fragmentId, 3.0))) * 10.0;
+                        mat3 rotMatrix = rotation3d(randomAxis, angle);
+                        pos -= fragmentGroupCenter;
+                        pos = rotMatrix * pos;
+                        pos += fragmentGroupCenter;
+                    }
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                }
+            `;
+            const fragmentShader = `
+                varying vec3 vNormal;
+                uniform vec3 u_color;
+                void main() {
+                    vec3 lightDir = normalize(vec3(1.0, 2.0, 1.5));
+                    float lighting = 0.6 + max(0.0, dot(normalize(vNormal), lightDir)) * 0.8;
+                    gl_FragColor = vec4(u_color * lighting, 1.0);
+                }
+            `;
+
+            // --- Initialization ---
+            function init() {
+                clock = new THREE.Clock();
+                scene = new THREE.Scene();
+                scene.fog = new THREE.Fog(backgroundColor, 50, 400);
+
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(25, 25, 25);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setClearColor(backgroundColor);
+                canvasContainer.appendChild(renderer.domElement);
+
+                const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
+                scene.add(hemisphereLight);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+                directionalLight.position.set(10, 10, 10);
+                scene.add(directionalLight);
+                
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.maxDistance = 300; 
+                
+                rebuildBtn.disabled = true;
+                
+                addEventListeners();
+                randomizeAllSettings();
+                setupSound();
+                loadDefaultModel();
+                animate();
+            }
+
+            // --- Core Logic ---
+            function randomizeAllSettings() {
+                const getRandom = (slider) => {
+                    const min = parseFloat(slider.min);
+                    const max = parseFloat(slider.max);
+                    return Math.random() * (max - min) + min;
+                }
+
+                fragmentsSlider.value = Math.floor(getRandom(fragmentsSlider));
+                forceSlider.value = getRandom(forceSlider);
+                spinSlider.value = getRandom(spinSlider);
+                gravitySlider.value = getRandom(gravitySlider);
+                dampingSlider.value = getRandom(dampingSlider);
+                durationSlider.value = getRandom(durationSlider);
+                timescaleSlider.value = getRandom(timescaleSlider);
+                hueSlider.value = Math.random();
+                
+                // Manually trigger 'input' event to update displays
+                fragmentsSlider.dispatchEvent(new Event('input'));
+                forceSlider.dispatchEvent(new Event('input'));
+                spinSlider.dispatchEvent(new Event('input'));
+                gravitySlider.dispatchEvent(new Event('input'));
+                dampingSlider.dispatchEvent(new Event('input'));
+                durationSlider.dispatchEvent(new Event('input'));
+                timescaleSlider.dispatchEvent(new Event('input'));
+                hueSlider.dispatchEvent(new Event('input'));
+
+                const options = explosionStyleSelect.querySelectorAll('.custom-select-option');
+                const randomIndex = Math.floor(Math.random() * options.length);
+                options[randomIndex].click();
+            }
+
+            function updateColorFromHue() {
+                modelHue = parseFloat(hueSlider.value);
+                modelColor.setHSL(modelHue, 1.0, 0.6);
+                hueValue.textContent = modelHue.toFixed(2);
+
+                if (originalModel) {
+                    originalModel.material.color.set(modelColor);
+                }
+                if (explodedModel) {
+                    explodedModel.material.uniforms.u_color.value.set(modelColor);
+                }
+            }
+
+            function setupSound() {
+                compressor = new Tone.Compressor(-10, 5).toDestination();
+                distortion = new Tone.Distortion(0.9).connect(compressor);
+                lowPass = new Tone.Filter(12000, "lowpass").connect(distortion);
+                noiseSynth = new Tone.NoiseSynth({
+                    noise: { type: "brown" },
+                    envelope: { attack: 0.005, decay: 0.15, sustain: 0.2, release: 0.3 }
+                }).connect(lowPass);
+                boomSynth = new Tone.MembraneSynth({
+                    pitchDecay: 0.01,
+                    octaves: 3,
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.001, decay: 0.8, sustain: 0.01, release: 1 }
+                }).connect(compressor);
+            }
+
+            function playExplosionSound() {
+                if (noiseSynth && boomSynth && lowPass) {
+                    const now = Tone.now();
+                    boomSynth.triggerAttackRelease("G0", "1n", now);
+                    noiseSynth.triggerAttackRelease("0.5n", now);
+                    lowPass.frequency.setValueAtTime(12000, now);
+                    lowPass.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+                }
+            }
+            
+            function loadDefaultModel() {
+                showMessage("Loading default model...", 0);
+                const loader = new THREE.STLLoader();
+                loader.load(
+                    'assets/makerdeck-chris.stl',
+                    (geometry) => { setupModel(geometry); showMessage("", 0); },
+                    undefined,
+                    (error) => { console.error('Error loading default model:', error); showMessage("Could not load default model.", 10000); }
+                );
+            }
+
+            function loadSTLFromFile(file) {
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const loader = new THREE.STLLoader();
+                        const geometry = loader.parse(e.target.result);
+                        setupModel(geometry);
+                    } catch (error) {
+                        showMessage("Error: Could not parse STL file.", 5000);
+                        console.error(error);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function setupModel(geometry) {
+                if (originalModel) {
+                    scene.remove(originalModel);
+                    originalModel.geometry.dispose();
+                    originalModel.material.dispose();
+                }
+                rebuildModel();
+
+                geometry.computeVertexNormals();
+                geometry.computeBoundingBox();
+                
+                modelSize = geometry.boundingBox.getSize(new THREE.Vector3()).length();
+                
+                const material = new THREE.MeshStandardMaterial({ color: modelColor, metalness: 0.3, roughness: 0.6 });
+                originalModel = new THREE.Mesh(geometry, material);
+                
+                const box = new THREE.Box3().setFromObject(originalModel);
+                const size = box.getSize(new THREE.Vector3());
+                const scale = 15 / Math.max(size.x, size.y, size.z);
+                originalModel.scale.set(scale, scale, scale);
+                originalModel.geometry.center();
+                originalModel.updateMatrixWorld();
+
+                scene.add(originalModel);
+            }
+
+            function explode(impactPoint) {
+                if (!originalModel || isExploded || explosionInProgress) return;
+
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                playExplosionSound();
+                
+                explosionInProgress = true;
+                rebuildBtn.disabled = true;
+                
+                setTimeout(() => {
+                    const forceMultiplier = 1.0 + (modelSize * 0.1);
+                    const scaledForce = parseFloat(forceSlider.value) * forceMultiplier;
+
+                    const numFragments = parseInt(fragmentsSlider.value);
+                    const originalGeometry = originalModel.geometry;
+                    const positions = originalGeometry.attributes.position.array;
+                    const normals = originalGeometry.attributes.normal.array;
+                    const triangleCount = positions.length / 9;
+
+                    const fragmentData = Array.from({ length: numFragments }, () => ({ centerSum: new THREE.Vector3(), triangleCount: 0, avgCenter: new THREE.Vector3() }));
+
+                    for (let i = 0; i < triangleCount; i++) {
+                        const fragmentId = Math.min(numFragments - 1, Math.floor(i / (triangleCount / numFragments)));
+                        const i9 = i * 9;
+                        const p1 = new THREE.Vector3(positions[i9], positions[i9 + 1], positions[i9 + 2]);
+                        const p2 = new THREE.Vector3(positions[i9 + 3], positions[i9 + 4], positions[i9 + 5]);
+                        const p3 = new THREE.Vector3(positions[i9 + 6], positions[i9 + 7], positions[i9 + 8]);
+                        const triangleCenter = new THREE.Vector3().add(p1).add(p2).add(p3).divideScalar(3);
+                        fragmentData[fragmentId].centerSum.add(triangleCenter);
+                        fragmentData[fragmentId].triangleCount++;
+                    }
+                    fragmentData.forEach(data => { if (data.triangleCount > 0) data.avgCenter.copy(data.centerSum).divideScalar(data.triangleCount); });
+
+                    const explodedGeometry = new THREE.BufferGeometry();
+                    const newPositions = new Float32Array(positions.length);
+                    const newNormals = new Float32Array(normals.length);
+                    const fragmentGroupCenters = new Float32Array(positions.length);
+                    const fragmentIds = new Float32Array(positions.length / 3);
+
+                    for (let i = 0; i < triangleCount; i++) {
+                        const i9 = i * 9, i3 = i * 3;
+                        const fragmentId = Math.min(numFragments - 1, Math.floor(i / (triangleCount / numFragments)));
+                        const groupCenter = fragmentData[fragmentId].avgCenter;
+                        for (let j = 0; j < 3; j++) {
+                            const j9 = i9 + j * 3;
+                            newPositions[j9] = positions[j9]; newPositions[j9 + 1] = positions[j9 + 1]; newPositions[j9 + 2] = positions[j9 + 2];
+                            newNormals[j9] = normals[j9]; newNormals[j9 + 1] = normals[j9 + 1]; newNormals[j9 + 2] = normals[j9 + 2];
+                            fragmentGroupCenters[j9] = groupCenter.x; fragmentGroupCenters[j9 + 1] = groupCenter.y; fragmentGroupCenters[j9 + 2] = groupCenter.z;
+                            fragmentIds[i3 + j] = fragmentId;
+                        }
+                    }
+
+                    explodedGeometry.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));
+                    explodedGeometry.setAttribute('normal', new THREE.BufferAttribute(newNormals, 3));
+                    explodedGeometry.setAttribute('fragmentGroupCenter', new THREE.BufferAttribute(fragmentGroupCenters, 3));
+                    explodedGeometry.setAttribute('fragmentId', new THREE.BufferAttribute(fragmentIds, 1));
+
+                    const shaderMaterial = new THREE.ShaderMaterial({
+                        vertexShader, fragmentShader,
+                        uniforms: {
+                            u_time: { value: 0.0 },
+                            u_duration: { value: parseFloat(durationSlider.value) },
+                            u_force: { value: scaledForce },
+                            u_spin: { value: parseFloat(spinSlider.value) },
+                            u_gravity: { value: parseFloat(gravitySlider.value) },
+                            u_damping: { value: parseFloat(dampingSlider.value) },
+                            u_explosionType: { value: parseInt(explosionStyleSelect.dataset.value) },
+                            u_explosionCenter: { value: impactPoint },
+                            u_color: { value: modelColor.clone() }
+                        },
+                        polygonOffset: true,
+                        polygonOffsetFactor: -1,
+                        polygonOffsetUnits: -4
+                    });
+
+                    explodedModel = new THREE.Mesh(explodedGeometry, shaderMaterial);
+                    explodedModel.matrix.copy(originalModel.matrix);
+                    explodedModel.matrix.decompose(explodedModel.position, explodedModel.quaternion, explodedModel.scale);
+
+                    scene.add(explodedModel);
+                    
+                    setTimeout(() => {
+                        if (originalModel) {
+                            originalModel.visible = false;
+                        }
+                    }, 50);
+
+                    isExploded = true;
+                    explosionTime = 0;
+                    rebuildBtn.disabled = false;
+                }, 10);
+            }
+
+            function rebuildModel() {
+                if (explodedModel) {
+                    scene.remove(explodedModel);
+                    explodedModel.geometry.dispose();
+                    explodedModel.material.dispose();
+                    explodedModel = null;
+                }
+                if(originalModel) {
+                    originalModel.visible = true;
+                }
+                isExploded = false;
+                explosionInProgress = false;
+                explosionTime = 0;
+                rebuildBtn.disabled = true;
+            }
+            
+            function showMessage(text, duration = 3000) {
+                clearTimeout(messageTimeout);
+                if (!text) { messageBox.style.display = 'none'; return; }
+                messageText.textContent = text;
+                messageBox.style.display = 'block';
+                if (duration > 0) { messageTimeout = setTimeout(() => { messageBox.style.display = 'none'; }, duration); }
+            }
+
+            function setupCustomSelect() {
+                const selectContainer = document.getElementById('explosion-style-select');
+                const selectButton = selectContainer.querySelector('.custom-select-button');
+                const optionsContainer = selectContainer.querySelector('.custom-select-options');
+                const selectValue = document.getElementById('explosion-style-value');
+
+                selectButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    optionsContainer.classList.toggle('hidden');
+                    selectButton.setAttribute('aria-expanded', !optionsContainer.classList.contains('hidden'));
+                });
+
+                optionsContainer.querySelectorAll('.custom-select-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        selectContainer.dataset.value = option.dataset.value;
+                        selectValue.textContent = option.textContent;
+                        optionsContainer.querySelector('.selected')?.classList.remove('selected');
+                        optionsContainer.querySelector('[aria-selected="true"]')?.setAttribute('aria-selected', 'false');
+                        option.classList.add('selected');
+                        option.setAttribute('aria-selected', 'true');
+                        optionsContainer.classList.add('hidden');
+                        selectButton.setAttribute('aria-expanded', 'false');
+                    });
+                });
+
+                document.addEventListener('click', () => {
+                    optionsContainer.classList.add('hidden');
+                    selectButton.setAttribute('aria-expanded', 'false');
+                });
+            }
+
+            function addEventListeners() {
+                stlLoaderInput.addEventListener('change', (e) => loadSTLFromFile(e.target.files[0]));
+                rebuildBtn.addEventListener('click', rebuildModel);
+                
+                fragmentsSlider.addEventListener('input', (e) => fragmentsValue.textContent = e.target.value);
+                forceSlider.addEventListener('input', (e) => forceValue.textContent = parseFloat(e.target.value).toFixed(1));
+                spinSlider.addEventListener('input', (e) => spinValue.textContent = parseFloat(e.target.value).toFixed(1));
+                gravitySlider.addEventListener('input', (e) => gravityValue.textContent = parseFloat(e.target.value).toFixed(1));
+                dampingSlider.addEventListener('input', (e) => dampingValue.textContent = parseFloat(e.target.value).toFixed(2));
+                durationSlider.addEventListener('input', (e) => durationValue.textContent = parseFloat(e.target.value).toFixed(1) + 's');
+                timescaleSlider.addEventListener('input', (e) => timescaleValue.textContent = parseFloat(e.target.value).toFixed(1) + 'x');
+                hueSlider.addEventListener('input', updateColorFromHue);
+                randomizeBtn.addEventListener('click', randomizeAllSettings);
+                
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+                
+                renderer.domElement.addEventListener('click', (event) => {
+                    if (!originalModel || !originalModel.visible || isExploded || explosionInProgress) return;
+                    
+                    const mouse = new THREE.Vector2((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.setFromCamera(mouse, camera);
+                    const intersects = raycaster.intersectObject(originalModel);
+                    
+                    if (intersects.length > 0) {
+                        explode(intersects[0].point);
+                    }
+                });
+
+                window.addEventListener('dragover', (e) => e.preventDefault());
+                window.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files.length > 0) {
+                        const file = e.dataTransfer.files[0];
+                        if (file.name.toLowerCase().endsWith('.stl')) {
+                            loadSTLFromFile(file);
+                        } else {
+                            showMessage("Please drop a valid .STL file.", 3000);
+                        }
+                    }
+                });
+
+                setupCustomSelect();
+            }
+
+            // --- Animation Loop ---
+            function animate() {
+                requestAnimationFrame(animate);
+                const deltaTime = clock.getDelta() * parseFloat(timescaleSlider.value);
+                controls.update();
+                if (isExploded && explodedModel) {
+                    explosionTime += deltaTime;
+                    const material = explodedModel.material;
+                    material.uniforms.u_time.value = explosionTime;
+                    
+                    material.uniforms.u_gravity.value = parseFloat(gravitySlider.value);
+                    material.uniforms.u_damping.value = parseFloat(dampingSlider.value);
+                    material.uniforms.u_spin.value = parseFloat(spinSlider.value);
+
+                    if (explosionTime > material.uniforms.u_duration.value + 10.0) { 
+                        explosionInProgress = false;
+                    }
+                }
+                renderer.render(scene, camera);
+            }
+
+            // --- Start the application ---
+            function checkLibraries() {
+                if (typeof THREE !== 'undefined' && THREE.STLLoader && THREE.OrbitControls && typeof Tone !== 'undefined') {
+                    init();
+                } else {
+                    setTimeout(checkLibraries, 100);
+                }
+            }
+            checkLibraries();
+        });
+    </script>
+</body>
+</html>
